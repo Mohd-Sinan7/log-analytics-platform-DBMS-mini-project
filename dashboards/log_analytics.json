@@ -1,0 +1,162 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "description": "Log Analytics Platform Overview",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "custom": {"lineWidth": 2}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT bucket AS time, severity AS metric, SUM(count) AS value FROM log_counts_minute WHERE $__timeFilter(bucket) AND ('$service' = 'all' OR service = '$service') GROUP BY bucket, severity ORDER BY bucket",
+          "refId": "A"
+        }
+      ],
+      "title": "Logs per Minute by Severity",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "custom": {"lineWidth": 2}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT bucket AS time, service, CASE WHEN SUM(count) > 0 THEN ROUND(SUM(CASE WHEN severity IN ('ERROR','FATAL') THEN count ELSE 0 END)::numeric / SUM(count), 4) ELSE 0 END AS error_rate FROM log_counts_minute WHERE $__timeFilter(bucket) GROUP BY bucket, service ORDER BY bucket",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate per Service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["sum"]}},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT host, COUNT(*) AS count FROM logs WHERE $__timeFilter(ts) AND severity = 'ERROR' GROUP BY host ORDER BY count DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10 Noisy Hosts (ERROR)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+      "id": 4,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT severity, COUNT(*) AS count FROM logs WHERE $__timeFilter(ts) GROUP BY severity ORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Severity Distribution",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "zscore"}, "properties": [{"id": "decimals", "value": 2}]},
+          {"matcher": {"id": "byName", "options": "value"}, "properties": [{"id": "decimals", "value": 0}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+      "id": 5,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT detected_at, service, bucket, metric, value, baseline_mean, zscore FROM anomalies WHERE $__timeFilter(detected_at) ORDER BY detected_at DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Anomalies",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 6,
+      "options": {"showHeader": true, "footer": {"show": false}},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ts, severity, service, host, trace_id, message FROM logs WHERE $__timeFilter(ts) AND severity IN ('ERROR','FATAL') AND ('$service' = 'all' OR service = '$service') ORDER BY ts DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent ERROR/FATAL Logs",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["logs", "analytics"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": true, "text": "all", "value": "all"},
+        "datasource": {"type": "postgres", "uid": "PostgresLogs"},
+        "definition": "SELECT 'all' UNION SELECT DISTINCT service FROM logs ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Service",
+        "name": "service",
+        "options": [],
+        "query": "SELECT 'all' UNION SELECT DISTINCT service FROM logs ORDER BY 1",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Log Analytics Overview",
+  "uid": "log-analytics-overview",
+  "version": 1
+}
